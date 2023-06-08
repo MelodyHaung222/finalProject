@@ -1,0 +1,166 @@
+import numpy as np
+import pandas as pd
+import csv
+import flet as ft
+import requests
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+
+weather_df = pd.read_csv('weather.csv', header=None)
+weather = weather_df.values
+
+city = []
+for i in range(1, len(weather)):
+    city.append(str(weather[i][0]))
+    
+csvfile = "weather.csv"
+
+url = 'https://opendata.cwb.gov.tw/fileapi/v1/opendataapi/F-C0032-001?Authorization=CWB-27185B1A-58E5-4E1F-A9D4-8A1F836352BD&downloadType=WEB&format=JSON'
+data = requests.get(url)   # 取得 JSON 檔案的內容為文字
+data_json = data.json()    # 轉換成 JSON 格式
+location = data_json['cwbopendata']['dataset']['location']
+
+
+items = []
+for i in location:
+    item = []
+    item.append(i['locationName'])    # 縣市名稱
+    item.append(i['weatherElement'][0]['time'][0]['parameter']['parameterName'])    # 天氣現象
+    item.append(i['weatherElement'][1]['time'][0]['parameter']['parameterName']) # 最高溫
+    item.append(i['weatherElement'][2]['time'][0]['parameter']['parameterName'])  # 最低溫
+    item.append(i['weatherElement'][3]['time'][0]['parameter']['parameterName'])   # 舒適度
+    item.append(i['weatherElement'][4]['time'][0]['parameter']['parameterName'])   # 降雨機率
+    items.append(item)
+
+    
+
+#title = ["縣市名稱","天氣現象","最高溫","最低溫","舒適度","降雨機率"]
+with open(csvfile,"w+",encoding='utf-8',newline='') as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerow(["縣市名稱","天氣現象","最高溫","最低溫","舒適度","降雨機率"])
+    for item in items:
+        writer.writerow(item)
+        
+
+
+
+historical_data = ([27,70],[26,80],[28,90],[28,100],[28,20],[28,30],[27,10],[28,40],[27,50],[28,10],[29,30],[29,20],[30,20],[31,10],[31,10],[29,20],[30,80],[29,80],[31,70],[30,90])
+
+
+# 目標天氣狀態（請替換為你的實際資料）
+target_weather =([
+    '適合出門，可能降雨請帶傘出門',
+    '適合出門，可能降雨請帶傘出門',
+    '適合出門，可能降雨請帶傘出門',
+    '適合出門，可能降雨請帶傘出門',
+    '適合出門，降雨機率低',
+    '適合出門，降雨機率低',
+    '適合出門，降雨機率低',
+    '適合出門，降雨機率低',
+    '適合出門，降雨機率低',
+    '適合出門，降雨機率低',
+    '紫外線強度高，請做好防曬再出門',
+    '紫外線強度高，請做好防曬再出門',
+    '紫外線強度高，請做好防曬再出門',
+    '紫外線強度高，請做好防曬再出門',
+    '紫外線強度高，請做好防曬再出門',
+    '紫外線強度高，請做好防曬再出門',
+    '紫外線強度高且可能下雨請待在家',
+    '紫外線強度高且可能下雨請待在家',
+    '紫外線強度高且可能下雨請待在家',
+    '紫外線強度高且可能下雨請待在家'])
+
+
+
+# 將資料分為訓練集和測試集
+X_train, X_test, y_train, y_test = train_test_split(historical_data, target_weather, test_size=0.2, random_state=42)
+
+# 建立和訓練機器學習模型
+model = LogisticRegression()
+model.fit(X_train, y_train)
+
+def main(page: ft.Page):
+    global choose_city
+
+    # GUI的排版
+    page.title = "Whether Predict and Suggest System"
+    page.window_width = 750
+    page.window_height = 600
+    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+
+    choose_city = ""
+    # 按鈕的function
+    choose = ft.Text()
+    def choose_city_click(aaa):
+        # 使用global變數定義choose_city讓其他function也能夠使用到被更新後的同樣參數
+        # 可以使用aaa.control.data抓到站名
+        global choose_city,i
+        choose_city = aaa.control.data
+        i = city.index(choose_city)
+        aaa.control.icon = "CHECK_CIRCLE_OUTLINED" #set icon
+        if choose_city is not None:
+            choose.value = f'{choose_city}'# get choose value
+        page.update()
+        
+    def predict():
+        X_test = [[items[i][2],items[i][5]]]
+        prediction = model.predict(X_test)
+        return prediction[0]
+    
+    highest = ft.Text()
+    lowest = ft.Text()
+    rain_rate = ft.Text()
+    def prediction_click(aaa):
+        aaa.control.icon = "CHECK_CIRCLE_OUTLINED" #set icon
+        highest.value = f'最高溫: {items[i][2]}度'
+        lowest.value = f'最低溫: {items[i][3]}度'
+        rain_rate.value = f'降雨量:{items[i][5]}%'
+
+        page.update()
+        
+    suggest1 = ft.Text()
+    suggest2 = ft.Text()
+    #suggest3 = ft.Text()
+   
+    def suggestion_click(aaa):
+        aaa.control.icon = "CHECK_CIRCLE_OUTLINED" #set icon
+        suggest1.value = f'天氣{items[i][4]}'
+        suggest2.value = f'預測結果:{predict()}'
+        page.update()
+    '''
+        if "舒適" in items[i][4]:
+            suggest2.value = f'適合出門'
+        elif "悶熱" in items[i][4]:
+            suggest2.value = f'請在家避暑'
+        if "陣雨" in items[i][1]:
+            suggest3.value = f'可能降雨請帶傘出門'
+        else:
+            suggest3.value = f'降雨機率低，可不必帶傘'
+    '''
+        
+    
+        
+    # ------建立物件------
+    choose_text = ft.Text("Please select your city", size=18)
+    
+    rows = 6
+    columns = 4
+    controls = []
+
+    for row in range(rows):
+        buttons = []
+        choose_index = row * columns
+        end_index = choose_index + columns
+        for index in range(choose_index, end_index):
+            if index>=len(city):
+                break
+            else:
+                buttons.append(ft.ElevatedButton(text=f"{city[index]}", data=f"{city[index]}", width=150, on_click = choose_city_click))
+        controls.append(ft.Row(controls=buttons))
+        
+
+    page.add(choose_text, *controls,ft.Row(controls=[ft.ElevatedButton(text=f"Get prediction", width=630, on_click=prediction_click)]),ft.Row(controls=[ft.ElevatedButton(text=f"Get suggest", width=630, on_click=suggestion_click)]),choose,highest,lowest,rain_rate,suggest1,suggest2)
+        
+ft.app(target=main)
+
+    
